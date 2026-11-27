@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Munkaidő & Túlóra Kalkulátor</title>
+    <!-- Tailwind CSS betöltése -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Tailwind konfiguráció sötét módhoz és egyedi betűtípushoz -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 min-h-screen transition-colors duration-300 antialiased selection:bg-indigo-500 selection:text-white">
+
+    <!-- Értesítési (Toast) üzenet doboz alert() helyett -->
+    <div id="toast-container" class="fixed bottom-5 right-5 left-5 sm:left-auto z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- Fő konténer -->
+    <div class="max-w-lg mx-auto px-4 py-6 sm:py-10">
+        
+        <!-- Fejléc -->
+        <header class="flex items-center justify-between mb-6">
+            <div class="flex items-center gap-3">
+                <div class="w-11 h-11 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30">
+                    <!-- Óra ikon (SVG) -->
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Munkaidő Kalkulátor</h1>
+                    <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Napi távozás és túlóra-egyenleg</p>
+                </div>
+            </div>
+
+            <!-- Sötét / Világos mód váltó gomb -->
+            <button id="theme-toggle" type="button" aria-label="Téma váltása" class="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm transition-all active:scale-95">
+                <!-- Nap ikon (sötét módban látszik) -->
+                <svg id="icon-sun" class="w-5 h-5 hidden dark:block text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+                <!-- Hold ikon (világos módban látszik) -->
+                <svg id="icon-moon" class="w-5 h-5 block dark:hidden text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                </svg>
+            </button>
+        </header>
+
+        <!-- 1. KÁRTYA: Bemeneti adatok -->
+        <section class="bg-white dark:bg-slate-900 rounded-3xl p-5 sm:p-6 shadow-sm border border-slate-200/80 dark:border-slate-800 mb-5 space-y-5">
+            
+            <!-- Érkezés és Munkaidő rács -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                
+                <!-- Érkezés ideje -->
+                <div>
+                    <div class="flex items-center justify-between mb-1.5">
+                        <label for="arrival-time" class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Érkezés ideje</label>
+                        <button type="button" id="btn-now-arrival" class="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline px-1.5 py-0.5 rounded">Most</button>
+                    </div>
+                    <div class="relative">
+                        <input type="text" id="arrival-time" inputmode="numeric" maxlength="5" value="06:48" placeholder="06:48"
+                            class="w-full text-xl font-bold tracking-wider text-center py-3 px-4 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all">
+                    </div>
+                </div>
+
+                <!-- Munkaidő hossza -->
+                <div>
+                    <div class="flex items-center justify-between mb-1.5">
+                        <label for="work-duration" class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Munkaidő</label>
+                        <div class="flex gap-1">
+                            <button type="button" data-duration="08:00" class="preset-duration text-xs font-medium px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 hover:text-indigo-600 transition-colors">8:00</button>
+                            <button type="button" data-duration="08:30" class="preset-duration text-xs font-medium px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 hover:text-indigo-600 transition-colors">8:30</button>
+                        </div>
+                    </div>
+                    <div class="relative">
+                        <input type="text" id="work-duration" inputmode="numeric" maxlength="5" value="08:30" placeholder="08:30"
+                            class="w-full text-xl font-bold tracking-wider text-center py-3 px-4 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Meglévő túlóra egyenleg -->
+            <div class="pt-1 border-t border-slate-100 dark:border-slate-800/80">
+                <div class="flex items-center justify-between mb-1.5">
+                    <label for="overtime-balance" class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Meglévő túlóra egyenleg</label>
+                    <span class="text-xs text-slate-400 dark:text-slate-500">ÓÓ:PP formátum</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <!-- Plusz / Mínusz előjel váltó gomb -->
+                    <button type="button" id="overtime-sign-btn" aria-label="Előjel váltása"
+                        class="w-14 h-[52px] rounded-2xl font-extrabold text-xl flex items-center justify-center border transition-all active:scale-95 bg-emerald-50 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400">
+                        +
+                    </button>
+                    <input type="text" id="overtime-balance" inputmode="numeric" maxlength="6" value="01:28" placeholder="01:28"
+                        class="flex-1 text-xl font-bold tracking-wider text-center py-3 px-4 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all">
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. KÁRTYA: Fő eredmények (Normál és Legkorábbi hazamenetel) -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+            
+            <!-- Normál hazamenetel -->
+            <div class="bg-gradient-to-br from-indigo-600 to-indigo-700 dark:from-indigo-600 dark:to-indigo-800 rounded-3xl p-5 text-white shadow-lg shadow-indigo-500/20 relative overflow-hidden">
+                <div class="relative z-10">
+                    <span class="inline-block text-xs font-semibold uppercase tracking-wider text-indigo-200 mb-1">Normál hazamenetel</span>
+                    <div id="result-normal-leave" class="text-4xl font-extrabold tracking-tight my-1">15:18</div>
+                    <p id="result-normal-note" class="text-xs text-indigo-100/90 mt-1">Túlóra egyenleg változatlan</p>
+                </div>
+                <!-- Dekoratív kör -->
+                <div class="w-24 h-24 rounded-full bg-white/10 absolute -bottom-6 -right-6 pointer-events-none"></div>
+            </div>
+
+            <!-- Legkorábbi hazamenetel (túlóra felhasználásával) -->
+            <div class="bg-white dark:bg-slate-900 rounded-3xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Legkorábban (0:00-val)</span>
+                        <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                    </div>
+                    <div id="result-earliest-leave" class="text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white my-1">13:50</div>
+                </div>
+                <p id="result-earliest-note" class="text-xs text-slate-500 dark:text-slate-400 mt-1">Teljes túlóra keret felhasználásával</p>
+            </div>
+        </section>
+
+        <!-- 3. KÁRTYA: Tervezett távozás szimulátor -->
+        <section class="bg-white dark:bg-slate-900 rounded-3xl p-5 sm:p-6 shadow-sm border border-slate-200/80 dark:border-slate-800 mb-5">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <label for="planned-leave" class="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    Mikor szeretnék hazamenni?
+                </label>
+                <div class="flex items-center gap-1.5">
+                    <button type="button" id="btn-now-leave" class="text-xs font-medium px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">Most</button>
+                    <button type="button" id="btn-use-overtime" class="text-xs font-medium px-2.5 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors">Túlóra nullázása</button>
+                </div>
+            </div>
+
+            <div class="relative flex items-center">
+                <input type="text" id="planned-leave" inputmode="numeric" maxlength="5" value="14:00" placeholder="pl. 14:00 (opcionális)"
+                    class="w-full text-xl font-bold tracking-wider text-center py-3 px-10 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all">
+                <!-- Törlés (X) gomb -->
+                <button type="button" id="btn-clear-planned" aria-label="Tervezett idő törlése" class="absolute right-3 p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-700 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Szimuláció eredménye (akkor látszik, ha van érvényes tervezett távozás) -->
+            <div id="simulation-result-box" class="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 space-y-3">
+                <div class="grid grid-cols-2 gap-3">
+                    <!-- Mai napi mérleg -->
+                    <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
+                        <span class="block text-xs text-slate-500 dark:text-slate-400 mb-0.5">Mai egyenlegváltozás</span>
+                        <span id="sim-daily-diff" class="text-lg sm:text-xl font-bold text-amber-600 dark:text-amber-400">-01:18</span>
+                    </div>
+
+                    <!-- Új megmaradó túlóra -->
+                    <div id="sim-new-balance-card" class="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 transition-colors">
+                        <span class="block text-xs text-slate-600 dark:text-slate-300 mb-0.5">Új túlóra egyenleg</span>
+                        <span id="sim-new-balance" class="text-lg sm:text-xl font-extrabold text-emerald-600 dark:text-emerald-400">+00:10</span>
+                    </div>
+                </div>
+
+                <!-- Összegző szöveges visszajelzés -->
+                <div id="sim-summary-banner" class="p-3 rounded-2xl text-xs sm:text-sm font-medium bg-emerald-50/80 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 flex items-center gap-2.5">
+                    <span id="sim-summary-icon" class="text-base">✅</span>
+                    <span id="sim-summary-text">10 perc túlórád marad a következő munkanapra.</span>
+                </div>
+
+                <!-- Egyenleg frissítése a mai nappal gomb -->
+                <button type="button" id="btn-apply-today"
+                    class="w-full py-3.5 px-4 rounded-2xl bg-slate-900 dark:bg-indigo-600 hover:bg-slate-800 dark:hover:bg-indigo-500 text-white font-semibold text-sm shadow-sm transition-all active:scale-[0.99] flex items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Egyenleg frissítése a mai nappal
+                </button>
+            </div>
+        </section>
+
+        <!-- Lábléc: Mentés és alaphelyzetbe állítás -->
+        <footer class="flex items-center justify-between gap-3 px-1">
+            <button type="button" id="btn-save-settings"
+                class="flex-1 py-3 px-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold text-xs sm:text-sm shadow-sm transition-all active:scale-95 flex items-center justify-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                </svg>
+                Adatok mentése
+            </button>
+
+            <button type="button" id="btn-reset-defaults"
+                class="py-3 px-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 font-medium text-xs sm:text-sm shadow-sm transition-all active:scale-95">
+                Alaphelyzet
+            </button>
+        </footer>
+
+    </div>
+
+    <!-- Alkalmazás logika (Vanilla JavaScript) -->
+    <script>
+        /**
+         * Munkaidő és Túlóra Kalkulátor
+         * Minden számítás perc alapú a pontosság érdekében, majd HH:MM formátumra alakul.
+         */
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- DOM elemek hivatkozásai ---
+            const arrivalInput = document.getElementById('arrival-time');
+            const durationInput = document.getElementById('work-duration');
+            const overtimeInput = document.getElementById('overtime-balance');
+            const overtimeSignBtn = document.getElementById('overtime-sign-btn');
+            const plannedLeaveInput = document.getElementById('planned-leave');
+
+            const resultNormalLeave = document.getElementById('result-normal-leave');
+            const resultNormalNote = document.getElementById('result-normal-note');
+            const resultEarliestLeave = document.getElementById('result-earliest-leave');
+            const resultEarliestNote = document.getElementById('result-earliest-note');
+
+            const simResultBox = document.getElementById('simulation-result-box');
+            const simDailyDiff = document.getElementById('sim-daily-diff');
+            const simNewBalanceCard = document.getElementById('sim-new-balance-card');
+            const simNewBalance = document.getElementById('sim-new-balance');
+            const simSummaryBanner = document.getElementById('sim-summary-banner');
+            const simSummaryIcon = document.getElementById('sim-summary-icon');
+            const simSummaryText = document.getElementById('sim-summary-text');
+
+            const themeToggleBtn = document.getElementById('theme-toggle');
+
+            // --- Állapotváltozók ---
+            let overtimeSign = 1; // 1 = '+' (plusz), -1 = '-' (mínusz)
+            let calculatedNewBalanceMinutes = null; // Tárolja az új egyenleget percekben a frissítés gombhoz
+            const STORAGE_KEY = 'munkaido_kalkulator_v1';
+
+            // --- Segédfüggvények: Idő konverzió és formázás ---
+
+            /**
+             * HH:MM (vagy H:MM / 4 számjegyes) szövegből perceket számol.
+             * @param {string} str - Idő szöveg (pl. "06:48" vagy "6:48")
+             * @param {boolean} allowLargeHours - Engedélyezi-e a 24 óránál nagyobb értékeket (pl. túlóra esetén)
+             * @returns {number|null} Percek száma vagy null, ha érvénytelen
+             */
+            function parseTimeToMinutes(str, allowLargeHours = false) {
+                if (!str || typeof str !== 'string') return null;
+                const cleaned = str.trim().replace(/[^0-9:]/g, '');
+                if (!cleaned) return null;
+
+                let hours = 0;
+                let minutes = 0;
+
+                if (cleaned.includes(':')) {
+                    const parts = cleaned.split(':');
+                    if (parts.length !== 2) return null;
+                    hours = parseInt(parts[0] || '0', 10);
+                    minutes = parseInt(parts[1] || '0', 10);
+                } else if (cleaned.length <= 2) {
+                    hours = parseInt(cleaned, 10);
+                    minutes = 0;
+                } else if (cleaned.length === 3) {
+                    hours = parseInt(cleaned.slice(0, 1), 10);
+                    minutes = parseInt(cleaned.slice(1), 10);
+                } else if (cleaned.length >= 4) {
+                    hours = parseInt(cleaned.slice(0, -2), 10);
+                    minutes = parseInt(cleaned.slice(-2), 10);
+                }
+
+                if (isNaN(hours) || isNaN(minutes) || minutes < 0 || minutes > 59 || hours < 0) {
+                    return null;
+                }
+                if (!allowLargeHours && hours > 23) {
+                    return null;
+                }
+
+                return hours * 60 + minutes;
+            }
+
+            /**
+             * Perceket napszak formátumba alakít (00:00 - 23:59, éjfél átfordulással).
+             * @param {number} totalMinutes
+             * @returns {string} Pl. "15:18"
+             */
+            function formatClockTime(totalMinutes) {
+                if (totalMinutes === null || isNaN(totalMinutes)) return '--:--';
+                // Pozitív maradék 1440-nel (24 * 60)
+                const normalized = ((totalMinutes % 1440) + 1440) % 1440;
+                const h = Math.floor(normalized / 60);
+                const m = normalized % 60;
+                return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+            }
+
+            /**
+             * Időtartamot vagy egyenleget formáz előjellel vagy anélkül (pl. "+00:10", "-01:18", "08:30").
+             * @param {number} totalMinutes
+             * @param {boolean} showSign - Mutassa-e a + vagy - előjelet
+             * @returns {string}
+             */
+            function formatDuration(totalMinutes, showSign = false) {
+                if (totalMinutes === null || isNaN(totalMinutes)) return '--:--';
+                const sign = totalMinutes < 0 ? '-' : (showSign ? '+' : '');
+                const absMin = Math.abs(Math.round(totalMinutes));
+                const h = Math.floor(absMin / 60);
+                const m = absMin % 60;
+                return `${sign}${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+            }
+
+            /**
+             * Automatikus kettőspont beszúrása gépelés közben (pl. "0648" -> "06:48").
+             */
+            function handleTimeAutoFormat(e) {
+                const input = e.target;
+                // Csak számjegyeket és kettőspontot hagyunk meg
+                let val = input.value.replace(/[^0-9:]/g, '');
+                
+                // Ha a felhasználó töröl, ne erőltessük vissza azonnal a kettőspontot
+                if (e.inputType === 'deleteContentBackward' || e.inputType === 'deleteContentForward') {
+                    input.value = val;
+                    calculateAll();
+                    return;
+                }
+
+                // Ha még nincs kettőspont, és 3 vagy 4 számjegyet írt be
+                if (!val.includes(':') && val.length >= 3) {
+                    val = val.slice(0, 2) + ':' + val.slice(2, 4);
+                }
+
+                input.value = val;
+                calculateAll();
+            }
+
+            /**
+             * Mező elhagyásakor (blur) szépen formázza a beírt időt HH:MM alakra.
+             */
+            function handleTimeBlur(input, allowLargeHours = false) {
+                const mins = parseTimeToMinutes(input.value, allowLargeHours);
+                if (mins !== null) {
+                    input.value = formatDuration(mins, false);
+                }
+                calculateAll();
+            }
+
+            /**
+             * Értesítő üzenet (Toast) megjelenítése a képernyő alján.
+             */
+            function showToast(message, type = 'success') {
+                const container = document.getElementById('toast-container');
+                const toast = document.createElement('div');
+                
+                const bgColors = type === 'success' 
+                    ? 'bg-slate-900 dark:bg-indigo-600 text-white' 
+                    : 'bg-rose-600 text-white';
+
+                toast.className = `${bgColors} px-4 py-3 rounded-2xl shadow-xl text-sm font-medium flex items-center justify-between gap-3 transform transition-all duration-300 translate-y-4 opacity-0 pointer-events-auto`;
+                toast.innerHTML = `<span>${message}</span>`;
+                
+                container.appendChild(toast);
+
+                // Animáció indítása
+                requestAnimationFrame(() => {
+                    toast.classList.remove('translate-y-4', 'opacity-0');
+                });
+
+                // Eltüntetés 3 másodperc múlva
+                setTimeout(() => {
+                    toast.classList.add('translate-y-4', 'opacity-0');
+                    setTimeout(() => toast.remove(), 300);
+                }, 3000);
+            }
+
+            // --- Előjel gomb frissítése ---
+            function updateSignButtonUI() {
+                if (overtimeSign === 1) {
+                    overtimeSignBtn.textContent = '+';
+                    overtimeSignBtn.className = 'w-14 h-[52px] rounded-2xl font-extrabold text-xl flex items-center justify-center border transition-all active:scale-95 bg-emerald-50 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400';
+                } else {
+                    overtimeSignBtn.textContent = '−';
+                    overtimeSignBtn.className = 'w-14 h-[52px] rounded-2xl font-extrabold text-xl flex items-center justify-center border transition-all active:scale-95 bg-rose-50 dark:bg-rose-950/50 border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-400';
+                }
+            }
+
+            // --- Fő számítási függvény ---
+            function calculateAll() {
+                const arrivalMins = parseTimeToMinutes(arrivalInput.value, false);
+                const durationMins = parseTimeToMinutes(durationInput.value, false);
+                const rawOvertimeMins = parseTimeToMinutes(overtimeInput.value, true) || 0;
+                const overtimeMins = rawOvertimeMins * overtimeSign;
+
+                // Ha az érkezés vagy a munkaidő hibás/hiányos
+                if (arrivalMins === null || durationMins === null) {
+                    resultNormalLeave.textContent = '--:--';
+                    resultEarliestLeave.textContent = '--:--';
+                    simResultBox.classList.add('hidden');
+                    return;
+                }
+
+                // 1. Normál hazamenetel (Érkezés + Munkaidő)
+                const normalLeaveMins = arrivalMins + durationMins;
+                resultNormalLeave.textContent = formatClockTime(normalLeaveMins);
+                
+                // Napváltás jelzése, ha éjfél utánra esik
+                if (normalLeaveMins >= 1440) {
+                    resultNormalNote.textContent = 'Következő napon (+1 nap)';
+                } else {
+                    resultNormalNote.textContent = `Egyenleged marad: ${formatDuration(overtimeMins, true)}`;
+                }
+
+                // 2. Legkorábbi hazamenetel a meglévő túlórák teljes felhasználásával
+                const earliestLeaveMins = normalLeaveMins - overtimeMins;
+                resultEarliestLeave.textContent = formatClockTime(earliestLeaveMins);
+
+                if (overtimeMins > 0) {
+                    resultEarliestNote.textContent = `${formatDuration(overtimeMins, false)} túlóra felhasználásával`;
+                } else if (overtimeMins < 0) {
+                    resultEarliestNote.textContent = `${formatDuration(Math.abs(overtimeMins), false)} mínusz ledolgozásával`;
+                } else {
+                    resultEarliestNote.textContent = 'Nincs felhasználható túlóra';
+                }
+
+                // 3. Tervezett távozás szimulációja
+                const plannedLeaveMins = parseTimeToMinutes(plannedLeaveInput.value, false);
+
+                if (plannedLeaveMins === null) {
+                    simResultBox.classList.add('hidden');
+                    calculatedNewBalanceMinutes = null;
+                    return;
+                }
+
+                simResultBox.classList.remove('hidden');
+
+                // Ha a tervezett távozás kisebb, mint az érkezés (pl. éjszakai műszaknál 02:00), akkor +24 órát adunk hozzá
+                let adjustedPlannedMins = plannedLeaveMins;
+                if (plannedLeaveMins < arrivalMins - 120) {
+                    adjustedPlannedMins += 1440;
+                }
+
+                // Napi egyenlegváltozás = Tervezett távozás - Normál hazamenetel
+                const dailyDiffMins = adjustedPlannedMins - normalLeaveMins;
+                // Új túlóra egyenleg = Meglévő túlóra + Napi egyenlegváltozás
+                const newBalanceMins = overtimeMins + dailyDiffMins;
+                calculatedNewBalanceMinutes = newBalanceMins;
+
+                // Napi egyenlegváltozás megjelenítése
+                simDailyDiff.textContent = formatDuration(dailyDiffMins, true);
+                if (dailyDiffMins > 0) {
+                    simDailyDiff.className = 'text-lg sm:text-xl font-bold text-emerald-600 dark:text-emerald-400';
+                } else if (dailyDiffMins < 0) {
+                    simDailyDiff.className = 'text-lg sm:text-xl font-bold text-amber-600 dark:text-amber-400';
+                } else {
+                    simDailyDiff.className = 'text-lg sm:text-xl font-bold text-slate-700 dark:text-slate-200';
+                }
+
+                // Új megmaradó túlóra egyenleg megjelenítése és színezése
+                simNewBalance.textContent = formatDuration(newBalanceMins, true);
+
+                if (newBalanceMins > 0) {
+                    // Pluszban marad (Zöld)
+                    simNewBalanceCard.className = 'p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 transition-colors';
+                    simNewBalance.className = 'text-lg sm:text-xl font-extrabold text-emerald-600 dark:text-emerald-400';
+                    simSummaryBanner.className = 'p-3 rounded-2xl text-xs sm:text-sm font-medium bg-emerald-50/80 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 flex items-center gap-2.5';
+                    simSummaryIcon.textContent = '✅';
+                    simSummaryText.textContent = `${formatDuration(newBalanceMins, false)} túlórád marad a következő napra.`;
+                } else if (newBalanceMins === 0) {
+                    // Pontosan nulla (Semleges / Kék)
+                    simNewBalanceCard.className = 'p-3.5 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 transition-colors';
+                    simNewBalance.className = 'text-lg sm:text-xl font-extrabold text-indigo-600 dark:text-indigo-400';
+                    simSummaryBanner.className = 'p-3 rounded-2xl text-xs sm:text-sm font-medium bg-indigo-50/80 dark:bg-indigo-950/30 text-indigo-800 dark:text-indigo-300 flex items-center gap-2.5';
+                    simSummaryIcon.textContent = '⚖️';
+                    simSummaryText.textContent = 'Pontosan 00:00-ra nullázod a túlóra-egyenlegedet.';
+                } else {
+                    // Mínuszba megy (Piros/Narancs)
+                    simNewBalanceCard.className = 'p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 transition-colors';
+                    simNewBalance.className = 'text-lg sm:text-xl font-extrabold text-rose-600 dark:text-rose-400';
+                    simSummaryBanner.className = 'p-3 rounded-2xl text-xs sm:text-sm font-medium bg-rose-50/80 dark:bg-rose-950/30 text-rose-800 dark:text-rose-300 flex items-center gap-2.5';
+                    simSummaryIcon.textContent = '⚠️';
+                    simSummaryText.textContent = `Figyelem! ${formatDuration(Math.abs(newBalanceMins), false)} mínuszba kerülsz.`;
+                }
+            }
+
+            // --- LocalStorage mentés és betöltés ---
+            function saveToLocalStorage(silent = false) {
+                try {
+                    const data = {
+                        arrival: arrivalInput.value,
+                        duration: durationInput.value,
+                        overtime: overtimeInput.value,
+                        overtimeSign: overtimeSign,
+                        plannedLeave: plannedLeaveInput.value
+                    };
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+                    if (!silent) {
+                        showToast('Beállítások és egyenleg elmentve! 💾');
+                    }
+                } catch (err) {
+                    console.error('Mentési hiba:', err);
+                }
+            }
+
+            function loadFromLocalStorage() {
+                try {
+                    const raw = localStorage.getItem(STORAGE_KEY);
+                    if (raw) {
+                        const data = JSON.parse(raw);
+                        if (data.arrival) arrivalInput.value = data.arrival;
+                        if (data.duration) durationInput.value = data.duration;
+                        if (data.overtime) overtimeInput.value = data.overtime;
+                        if (data.overtimeSign === 1 || data.overtimeSign === -1) {
+                            overtimeSign = data.overtimeSign;
+                        }
+                        if (data.plannedLeave !== undefined) plannedLeaveInput.value = data.plannedLeave;
+                    }
+                } catch (err) {
+                    console.error('Betöltési hiba:', err);
+                }
+                updateSignButtonUI();
+                calculateAll();
+            }
+
+            // --- Sötét / Világos mód kezelése ---
+            function initTheme() {
+                const savedTheme = localStorage.getItem('theme');
+                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+                    document.documentElement.classList.add('dark');
+                }
+            }
+
+            themeToggleBtn.addEventListener('click', () => {
+                const isDark = document.documentElement.classList.toggle('dark');
+                localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            });
+
+            // --- Eseménykezelők ---
+
+            // Élő gépelés és formázás az inputokon
+            [arrivalInput, durationInput, overtimeInput, plannedLeaveInput].forEach(input => {
+                input.addEventListener('input', handleTimeAutoFormat);
+                // Fókuszkor kijelöli a szöveget a gyors felülíráshoz
+                input.addEventListener('focus', () => input.select());
+            });
+
+            arrivalInput.addEventListener('blur', () => handleTimeBlur(arrivalInput, false));
+            durationInput.addEventListener('blur', () => handleTimeBlur(durationInput, false));
+            overtimeInput.addEventListener('blur', () => handleTimeBlur(overtimeInput, true));
+            plannedLeaveInput.addEventListener('blur', () => handleTimeBlur(plannedLeaveInput, false));
+
+            // Túlóra előjel (+/-) váltása
+            overtimeSignBtn.addEventListener('click', () => {
+                overtimeSign = overtimeSign === 1 ? -1 : 1;
+                updateSignButtonUI();
+                calculateAll();
+            });
+
+            // Gyorsgombok: Munkaidő (8:00, 8:30)
+            document.querySelectorAll('.preset-duration').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    durationInput.value = btn.getAttribute('data-duration');
+                    calculateAll();
+                });
+            });
+
+            // Gyorsgomb: Érkezés -> Mostani időpont
+            document.getElementById('btn-now-arrival').addEventListener('click', () => {
+                const now = new Date();
+                const formatted = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+                arrivalInput.value = formatted;
+                calculateAll();
+            });
+
+            // Gyorsgomb: Tervezett távozás -> Mostani időpont
+            document.getElementById('btn-now-leave').addEventListener('click', () => {
+                const now = new Date();
+                const formatted = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+                plannedLeaveInput.value = formatted;
+                calculateAll();
+            });
+
+            // Gyorsgomb: Tervezett távozás -> Túlóra nullázása (Legkorábbi hazamenetel beírása)
+            document.getElementById('btn-use-overtime').addEventListener('click', () => {
+                const earliest = resultEarliestLeave.textContent;
+                if (earliest && earliest !== '--:--') {
+                    plannedLeaveInput.value = earliest;
+                    calculateAll();
+                }
+            });
+
+            // Tervezett távozás törlése
+            document.getElementById('btn-clear-planned').addEventListener('click', () => {
+                plannedLeaveInput.value = '';
+                calculateAll();
+            });
+
+            // Egyenleg frissítése a mai nappal (átírja a meglévő túlórát az új egyenlegre és elmenti)
+            document.getElementById('btn-apply-today').addEventListener('click', () => {
+                if (calculatedNewBalanceMinutes === null) return;
+
+                overtimeSign = calculatedNewBalanceMinutes < 0 ? -1 : 1;
+                overtimeInput.value = formatDuration(Math.abs(calculatedNewBalanceMinutes), false);
+                updateSignButtonUI();
+                
+                // Töröljük a tervezett távozást, hiszen a mai napot már lezártuk/alkalmaztuk
+                plannedLeaveInput.value = '';
+                calculateAll();
+                saveToLocalStorage(true);
+                showToast('Túlóra-egyenleg frissítve és elmentve! 🎉');
+            });
+
+            // Manuális mentés gomb
+            document.getElementById('btn-save-settings').addEventListener('click', () => {
+                saveToLocalStorage(false);
+            });
+
+            // Alaphelyzetbe állítás gomb
+            document.getElementById('btn-reset-defaults').addEventListener('click', () => {
+                localStorage.removeItem(STORAGE_KEY);
+                arrivalInput.value = '06:48';
+                durationInput.value = '08:30';
+                overtimeInput.value = '01:28';
+                overtimeSign = 1;
+                plannedLeaveInput.value = '14:00';
+                updateSignButtonUI();
+                calculateAll();
+                showToast('Alapértelmezett értékek visszaállítva.');
+            });
+
+            // --- Inicializálás ---
+            initTheme();
+            loadFromLocalStorage();
+        });
+    </script>
+</body>
+</html>
